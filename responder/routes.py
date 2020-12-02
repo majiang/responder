@@ -4,6 +4,7 @@ import re
 import inspect
 import traceback
 from collections import defaultdict
+import logging
 
 from starlette.middleware.wsgi import WSGIMiddleware
 from starlette.websockets import WebSocket, WebSocketClose
@@ -23,6 +24,8 @@ _CONVERTORS = {
 }
 
 PARAM_RE = re.compile("{([a-zA-Z_][a-zA-Z0-9_]*)(:[a-zA-Z_][a-zA-Z0-9_]*)?}")
+
+logger = logging.getLogger(__name__)
 
 
 def compile_path(path):
@@ -234,6 +237,7 @@ class Router:
         :param endpoint: The endpoint for the route -- can be callable, or class.
         :param default: If ``True``, all unknown requests will route to this view.
         """
+        logging.debug('Router.add_route(%s, %s, default=%s, ws=%s, before=%s, check_existing=%s)', route, endpoint, default, websocket, before_request, check_existing)
         if before_request:
             if websocket:
                 self.before_requests.setdefault("ws", []).append(endpoint)
@@ -288,6 +292,7 @@ class Router:
         return None
 
     async def default_response(self, scope, receive, send):
+        logger.debug('Router-embedded default_response')
         if scope["type"] == "websocket":
             websocket_close = WebSocketClose()
             await websocket_close(receive, send)
@@ -299,11 +304,14 @@ class Router:
         raise HTTPException(status_code=status_codes.HTTP_404)
 
     def _resolve_route(self, scope):
+        logger.debug('scope=%s, routes=%s', scope, self.routes)
         for route in self.routes:
             matches, child_scope = route.matches(scope)
             if matches:
                 scope.update(child_scope)
+                logger.debug('route %s, matches %s', route, matches)
                 return route
+        logger.debug('no match')
         return None
 
     async def lifespan(self, scope, receive, send):
@@ -355,4 +363,5 @@ class Router:
                     await app(scope, receive, send)
                     return
 
+        logger.debug('calling default_endpoint')
         await self.default_endpoint(scope, receive, send)

@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 
 from pathlib import Path
 
@@ -25,6 +26,9 @@ from .statics import DEFAULT_API_THEME, DEFAULT_CORS_PARAMS, DEFAULT_SECRET_KEY
 from .ext.schema import Schema as OpenAPISchema
 from .staticfiles import StaticFiles
 from .templates import Templates
+
+
+logger = logging.getLogger(__name__)
 
 
 class API:
@@ -194,6 +198,7 @@ class API:
         :param default: If ``True``, all unknown requests will route to this view.
         :param static: If ``True``, and no endpoint was passed, render "static/index.html", and it will become a default route.
         """
+        logger.debug('API.add_route(%s, %s, default=%s, static=%s, check_existing=%s, ws=%s, before=%s)', route, endpoint, default, static, check_existing, websocket, before_request)
 
         # Path
         if static:
@@ -213,12 +218,15 @@ class API:
 
     async def _static_response(self, req, resp):
         assert self.static_dir is not None
+        logger.debug('API._static_response')
 
         index = (self.static_dir / "index.html").resolve()
         if os.path.exists(index):
+            logger.debug('path %s exists', index)
             with open(index, "r") as f:
                 resp.html = f.read()
         else:
+            logger.debug('404 from _static_response')
             resp.status_code = status_codes.HTTP_404
             resp.text = "Not found."
 
